@@ -5,6 +5,8 @@
 #include <opencv2/objdetect.hpp>
 #include <opencv2/video.hpp>
 
+#define KALMAN_DEBUG 1
+
 #define CM_TO_INCH 0.393701
 
 /**
@@ -93,10 +95,24 @@ public:
      * @param d new dpi
      */
     void setDpi(float d);
+  
+        
+#if KALMAN_DEBUG
+    std::vector<double> xraw, yraw, zraw, xfil, yfil, zfil; 
+#endif
     
 private:
+   
+    bool isFirstFrame;
     
     cv::KalmanFilter observerKalmanFilter;
+    
+    /**
+     * perform Kalman filtering on observer position
+     * @param observer : observer position
+     * @return filtered position
+     */
+    cv::Scalar filterObserverPosition(cv::Scalar observer);
     
     //observer of the scene
     cv::Scalar sceneObserver;

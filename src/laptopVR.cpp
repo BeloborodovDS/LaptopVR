@@ -106,6 +106,8 @@ LaptopVR::LaptopVR(int width, int height)
     
     //by default frame is not flipped
     flipFrame = false;
+    
+    isFirstFrame = true;
         
 }
 
@@ -120,23 +122,41 @@ bool LaptopVR::init()
     
     generateLines();
     
-    observerKalmanFilter.init(6,3,0);
+    //6 state coordinates: x,y,z,vx,vy,vz
+    //3 measurment coordinates: x,y,z
+    observerKalmanFilter.init(6,3);
     
+    //Physical model of the process
+    //Standard kinetic model: movement with constant speed
+    //state(k+1) = transitionMatrix * state(k)
     observerKalmanFilter.transitionMatrix = 0;
     observerKalmanFilter.transitionMatrix.diag(0) = 1.;
     observerKalmanFilter.transitionMatrix.diag(3) = 1.;
     
+    //we measure only x,y,z
+    //measurment(k) = measurementMatrix * state(k)
     cv::setIdentity(observerKalmanFilter.measurementMatrix);
     
     observerKalmanFilter.processNoiseCov = 0;
-    observerKalmanFilter.processNoiseCov.at<float>(0,0) = 0.001;
-    observerKalmanFilter.processNoiseCov.at<float>(1,1) = 0.001;
-    observerKalmanFilter.processNoiseCov.at<float>(2,2) = 0.001;
-    observerKalmanFilter.processNoiseCov.at<float>(3,3) = 0.001;
-    observerKalmanFilter.processNoiseCov.at<float>(4,4) = 0.001;
-    observerKalmanFilter.processNoiseCov.at<float>(5,5) = 0.001;
+    observerKalmanFilter.processNoiseCov.at<float>(0,0) = 1.;
+    observerKalmanFilter.processNoiseCov.at<float>(1,1) = 1.;
+    observerKalmanFilter.processNoiseCov.at<float>(2,2) = 1.;
+    observerKalmanFilter.processNoiseCov.at<float>(3,3) = 10.;
+    observerKalmanFilter.processNoiseCov.at<float>(4,4) = 10.;
+    observerKalmanFilter.processNoiseCov.at<float>(5,5) = 10.;
     
-    std::cout<<observerKalmanFilter.processNoiseCov<<std::endl;
+    observerKalmanFilter.measurementNoiseCov = 0;
+    observerKalmanFilter.measurementNoiseCov.at<float>(0,0) = 150.;
+    observerKalmanFilter.measurementNoiseCov.at<float>(1,1) = 150.;
+    observerKalmanFilter.measurementNoiseCov.at<float>(2,2) = 2000.;
+    
+    observerKalmanFilter.errorCovPost = 0;
+    observerKalmanFilter.errorCovPost.at<float>(0,0) = 450.;
+    observerKalmanFilter.errorCovPost.at<float>(1,1) = 450.;
+    observerKalmanFilter.errorCovPost.at<float>(2,2) = 4000.;
+    observerKalmanFilter.errorCovPost.at<float>(3,3) = 4000.;
+    observerKalmanFilter.errorCovPost.at<float>(4,4) = 4000.;
+    observerKalmanFilter.errorCovPost.at<float>(5,5) = 4000.;
     
     return true;
 }
@@ -245,7 +265,7 @@ cv::Scalar LaptopVR::detectObserver(cv::Mat scene)
         
         //pick biggest face
         for (size_t i=0; i<detections.size(); i++)
-        {
+        {            
             if(detections[i].width > width)
             {
                 width = detections[i].width;
@@ -271,11 +291,74 @@ cv::Scalar LaptopVR::detectObserver(cv::Mat scene)
     return cv::Scalar();
 }
 
+cv::Scalar LaptopVR::filterObserverPosition(cv::Scalar observer)
+{
+    cv::Mat_<float> measurement(3,1);
+    cv::Scalar filtered;
+    
+    if(isFirstFrame)
+    {
+        isFirstFrame = false;
+        observerKalmanFilter.statePre = 0;
+        
+        if(observer == cv::Scalar())
+        {
+            observerKalmanFilter.statePre.at<float>(0) = boxWidth/2;
+            observerKalmanFilter.statePre.at<float>(1) = boxHeight/2;
+            observerKalmanFilter.statePre.at<float>(2) = boxWidth;
+            
+            observerKalmanFilter.errorCovPost *= 100;
+        }
+        else
+        {
+            observerKalmanFilter.statePre.at<float>(0) = observer[0];
+            observerKalmanFilter.statePre.at<float>(1) = observer[1];
+            observerKalmanFilter.statePre.at<float>(2) = observer[2];
+        }
+    }
+    
+    cv::Mat prediction = observerKalmanFilter.predict();
+    
+    if(observer != cv::Scalar())
+    {
+        cv::Mat refined_prediction;
+        
+        measurement.at<float>(0) = observer[0];
+        measurement.at<float>(1) = observer[1];
+        measurement.at<float>(2) = observer[2];
+        
+        refined_prediction = observerKalmanFilter.correct(measurement);
+        
+        filtered[0] = refined_prediction.at<float>(0);
+        filtered[1] = refined_prediction.at<float>(1);
+        filtered[2] = refined_prediction.at<float>(2);
+    }
+    else
+    {
+        filtered[0] = prediction.at<float>(0);
+        filtered[1] = prediction.at<float>(1);
+        filtered[2] = prediction.at<float>(2);
+    }
+    
+#if KALMAN_DEBUG
+    xraw.push_back(observer[0]);
+    yraw.push_back(observer[1]);
+    zraw.push_back(observer[2]);
+    
+    xfil.push_back(filtered[0]);
+    yfil.push_back(filtered[1]);
+    zfil.push_back(filtered[2]);
+#endif
+    
+    return filtered;
+}
+
 cv::Mat LaptopVR::renderFromCamFrame(cv::Mat camFrame)
 {
     cv::Scalar observer;
     
     observer = detectObserver(camFrame);
+    filterObserverPosition(observer);
     if (observer != cv::Scalar())
     {
         sceneObserver = observer;

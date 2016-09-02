@@ -10,8 +10,68 @@
 
 #include "../src/laptopVR.hpp"
 
+//debug
+#include <vector>
+
 using namespace std;
 using namespace cv;
+
+Mat plotVectors(vector<double> x1, vector<double> y1, 
+                vector<double> x2 = vector<double>(), vector<double> y2 = vector<double>())
+{
+    Mat plot(480, 640, CV_8UC3);
+    plot = 0;
+    
+    double xmn1=1000000, xmx1=-1000000;
+    double ymn1=1000000, ymx1=-1000000;
+    double xmn2=1000000, xmx2=-1000000;
+    double ymn2=1000000, ymx2=-1000000;
+    for(int i=0; i<x1.size(); i++)
+    {
+        if(x1[i]<xmn1)
+            xmn1=x1[i];
+        if(x1[i]>xmx1)
+            xmx1=x1[i];
+        
+        if(y1[i]<ymn1)
+            ymn1=y1[i];
+        if(y1[i]>ymx1)
+            ymx1=y1[i];
+    }
+    for(int i=0; i<x2.size(); i++)
+    {
+        if(x2[i]<xmn2)
+            xmn2=x2[i];
+        if(x2[i]>xmx2)
+            xmx2=x2[i];
+        
+        if(y2[i]<ymn2)
+            ymn2=y2[i];
+        if(y2[i]>ymx2)
+            ymx2=y2[i];
+    }
+    double xmx = max(xmx1, xmx2);
+    double ymx = max(ymx1, ymx2);
+    double xmn = min(xmn1, xmn2);
+    double ymn = min(ymn1, ymn2);
+    
+    Point pnt1, pnt2;
+    
+    for(int i=0; i<x1.size()-1; i++)
+    {
+        pnt1 = Point((x1[i]-xmn)/(xmx-xmn)*640, (y1[i]-ymn)/(ymx-ymn)*480);
+        pnt2 = Point((x1[i+1]-xmn)/(xmx-xmn)*640, (y1[i+1]-ymn)/(ymx-ymn)*480);
+        line(plot, pnt1, pnt2, Scalar(0,255,0), 2);
+    }
+    for(int i=0; i<x2.size()-1; i++)
+    {
+        pnt1 = Point((x2[i]-xmn)/(xmx-xmn)*640, (y2[i]-ymn)/(ymx-ymn)*480);
+        pnt2 = Point((x2[i+1]-xmn)/(xmx-xmn)*640, (y2[i+1]-ymn)/(ymx-ymn)*480);
+        line(plot, pnt1, pnt2, Scalar(0,0,255), 2);
+    }
+    
+    return plot;
+}
 
 int main()
 {
@@ -42,8 +102,8 @@ int main()
     
     //Create opencv window
     
-    cv::namedWindow("render", CV_WINDOW_NORMAL);
-    cv::setWindowProperty("render", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
+    //cv::namedWindow("render", CV_WINDOW_NORMAL);
+    //cv::setWindowProperty("render", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
     
     //Create LaptopVR engine 
     
@@ -89,8 +149,11 @@ int main()
         cap >> vid;
         
         //Get observer and render frame
-        frame = engine.renderFromCamFrame(vid);
-        imshow("render", frame);
+        //frame = engine.renderFromCamFrame(vid);
+        //imshow("render", frame);
+        
+        engine.detectObserver(vid);
+        imshow("detect", vid);
         
         //Exit if any key pressed
         if (waitKey(1)!=-1)
@@ -98,7 +161,14 @@ int main()
             break;
         }
     }
-        
+     
+     /*
+    Mat plot;
+    plot = plotVectors(engine.xraw, engine.yraw, engine.xfil, engine.yfil);
+    imshow("x,y", plot);
+    plot = plotVectors(engine.zraw, engine.yraw, engine.zfil, engine.yfil);
+    imshow("z,y", plot);
+    */
     
     //frame = engine.renderNextFrame(Scalar(320, 120, -1000));
     //imshow("result", frame);
