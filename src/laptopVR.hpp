@@ -78,6 +78,14 @@ public:
     cv::Point getRectCenter(cv::Rect rect);
     
     /**
+     * Scale rect around center
+     * @param rect rectangle
+     * @param factor scale factor
+     * @return scaled rect
+     */
+    cv::Rect scaleRectCentered(cv::Rect rect, float factor);
+    
+    /**
      * Set flag flipFrame
      * @param flip : true if necessary to flip frame, false otherwise
      */
@@ -102,6 +110,11 @@ public:
 #endif
     
 private:
+    
+    cv::Rect detectionROI;
+    int minFaceWidth;
+    int maxFaceWidth;
+    float expandFactorROI;
    
     bool isFirstFrame;
     

@@ -8,6 +8,8 @@
 
 #include <iostream>
 
+#include <ctime>
+
 #include "../src/laptopVR.hpp"
 
 //debug
@@ -76,6 +78,9 @@ Mat plotVectors(vector<double> x1, vector<double> y1,
 int main()
 {
     
+    clock_t start;
+    int nframes=0;
+    
     //Init GLFW
     
     if(!glfwInit())
@@ -102,8 +107,8 @@ int main()
     
     //Create opencv window
     
-    //cv::namedWindow("render", CV_WINDOW_NORMAL);
-    //cv::setWindowProperty("render", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
+    cv::namedWindow("render", CV_WINDOW_NORMAL);
+    cv::setWindowProperty("render", CV_WND_PROP_FULLSCREEN, CV_WINDOW_FULLSCREEN);
     
     //Create LaptopVR engine 
     
@@ -141,6 +146,8 @@ int main()
     
     //Capture-Render cycle
     
+    start = clock();
+    
     for(;;)
     {
         Mat vid;
@@ -148,12 +155,14 @@ int main()
         //Get frame
         cap >> vid;
         
-        //Get observer and render frame
-        //frame = engine.renderFromCamFrame(vid);
-        //imshow("render", frame);
+        nframes++;
         
-        engine.detectObserver(vid);
-        imshow("detect", vid);
+        //Get observer and render frame
+        frame = engine.renderFromCamFrame(vid);
+        imshow("render", frame);
+        
+        //engine.detectObserver(vid);
+        //imshow("detect", vid);
         
         //Exit if any key pressed
         if (waitKey(1)!=-1)
@@ -161,6 +170,10 @@ int main()
             break;
         }
     }
+    
+    double time;
+    time = (clock()-start)/(double)CLOCKS_PER_SEC;
+    cout<<"Frame rate:"<<nframes/time<<endl;
      
      /*
     Mat plot;

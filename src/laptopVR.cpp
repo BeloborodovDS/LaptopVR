@@ -31,6 +31,16 @@ cv::Point LaptopVR::getRectCenter(cv::Rect rect)
     return (rect.tl() + rect.br()) / 2;
 }
 
+cv::Rect LaptopVR::scaleRectCentered(cv::Rect rect, float factor)
+{
+    cv::Rect res;
+    res.x = rect.x - rect.width*(factor-1)*0.5;
+    res.y = rect.y - rect.height*(factor-1)*0.5;
+    res.width = rect.width*factor;
+    res.height = rect.height*factor;
+    return res;
+}
+
 cv::Scalar LaptopVR::projectPointOnFrame(cv::Scalar point, cv::Scalar observer)
 {
     //parameter indicating position on the point-observer line
@@ -108,13 +118,18 @@ LaptopVR::LaptopVR(int width, int height)
     flipFrame = false;
     
     isFirstFrame = true;
+    
+    detectionROI = cv::Rect(0,0,camWidth,camHeight);
+    minFaceWidth = camHeight/3;
+    maxFaceWidth = camHeight/3;
+    expandFactorROI = 1.5;
         
 }
 
 bool LaptopVR::init()
 {
     //load face detector
-    if (!faceDetectorHaar.load("./resource/haarcascade_frontalface_default.xml"))
+    if (!faceDetectorHaar.load("./resource/lbpcascade_frontalface.xml"))
     {
         printf("Cannot load Haar face detector!\n");
         return false;
@@ -251,11 +266,18 @@ cv::Scalar LaptopVR::detectObserver(cv::Mat scene)
     camWidth = scene.cols;
     camHeight = scene.rows;
     
+    detectionROI = scaleRectCentered(detectionROI, expandFactorROI) & cv::Rect(0, 0, camWidth, camHeight);
+    maxFaceWidth = std::max(maxFaceWidth*expandFactorROI, (float)camHeight);
+    minFaceWidth = std::min(minFaceWidth/expandFactorROI, (float)15.);
+    
     //conver to gray for detector
     cvtColor(scene, sceneGray, CV_BGR2GRAY);
     
     //detect facec
-    faceDetectorHaar.detectMultiScale(sceneGray, detections);
+    faceDetectorHaar.detectMultiScale(sceneGray(detectionROI), detections, 1.15, 3, 0, 
+                                      cv::Size(minFaceWidth, minFaceWidth), cv::Size(maxFaceWidth, maxFaceWidth));
+    
+    //cv::rectangle(scene, detectionROI, cv::Scalar(0,0,255), 1);
     
     //if we have faces
     if (detections.size() > 0)
@@ -266,13 +288,19 @@ cv::Scalar LaptopVR::detectObserver(cv::Mat scene)
         //pick biggest face
         for (size_t i=0; i<detections.size(); i++)
         {            
+            //cv::rectangle(scene, detections[i], cv::Scalar(255,0,0));
+            
             if(detections[i].width > width)
             {
                 width = detections[i].width;
                 ind = i;
             }
         }
-        bestDet = detections[ind];
+        bestDet = detections[ind] + detectionROI.tl();
+        
+        detectionROI = bestDet;
+        minFaceWidth = bestDet.width;
+        maxFaceWidth = bestDet.width;
         
         //calculate eye position
         camObserver = bestDet.tl() + cv::Point(bestDet.width/2, bestDet.height/3);
