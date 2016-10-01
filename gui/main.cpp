@@ -59,13 +59,13 @@ Mat plotVectors(vector<double> x1, vector<double> y1,
     
     Point pnt1, pnt2;
     
-    for(int i=0; i<x1.size()-1; i++)
+    for(int i=0; i+1<x1.size(); i++)
     {
         pnt1 = Point((x1[i]-xmn)/(xmx-xmn)*640, (y1[i]-ymn)/(ymx-ymn)*480);
         pnt2 = Point((x1[i+1]-xmn)/(xmx-xmn)*640, (y1[i+1]-ymn)/(ymx-ymn)*480);
         line(plot, pnt1, pnt2, Scalar(0,255,0), 2);
     }
-    for(int i=0; i<x2.size()-1; i++)
+    for(int i=0; i+1<x2.size(); i++)
     {
         pnt1 = Point((x2[i]-xmn)/(xmx-xmn)*640, (y2[i]-ymn)/(ymx-ymn)*480);
         pnt2 = Point((x2[i+1]-xmn)/(xmx-xmn)*640, (y2[i+1]-ymn)/(ymx-ymn)*480);
@@ -161,7 +161,7 @@ int main()
         frame = engine.renderFromCamFrame(vid);
         imshow("render", frame);
         
-        //engine.detectObserver(vid);
+        //engine.detectObserverSeeta(vid);
         //imshow("detect", vid);
         
         //Exit if any key pressed

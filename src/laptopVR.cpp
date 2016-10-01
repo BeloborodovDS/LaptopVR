@@ -67,7 +67,8 @@ Line LaptopVR::projectLineOnFrame(Line line, cv::Scalar observer)
     return proj;
 }
 
-LaptopVR::LaptopVR(int width, int height)
+LaptopVR::LaptopVR(int width, int height):
+landmarkDetector("./resource/seeta_fa_v1.1.bin")
 {
     //init box width & height if parameters are ok
     //else set default
@@ -254,6 +255,93 @@ cv::Scalar LaptopVR::getObserverFromFace(cv::Rect face, cv::Point eye)
     
 }
 
+
+cv::Scalar LaptopVR::detectObserverSeeta(cv::Mat scene)
+{
+    cv::Mat1b sceneGray;
+    std::vector<cv::Rect> detections;
+    cv::Rect bestDet;
+    cv::Scalar observer;
+    cv::Point camObserver;
+    
+    //refresh camera frames size
+    camWidth = scene.cols;
+    camHeight = scene.rows;
+    
+    detectionROI = scaleRectCentered(detectionROI, expandFactorROI) & cv::Rect(0, 0, camWidth, camHeight);
+    maxFaceWidth = std::max(maxFaceWidth*expandFactorROI, (float)camHeight);
+    minFaceWidth = std::min(minFaceWidth/expandFactorROI, (float)15.);
+    
+    //conver to gray for detector
+    cvtColor(scene, sceneGray, CV_BGR2GRAY);
+    
+    //detect facec
+    faceDetectorHaar.detectMultiScale(sceneGray(detectionROI), detections, 1.15, 3, 0, 
+                                      cv::Size(minFaceWidth, minFaceWidth), cv::Size(maxFaceWidth, maxFaceWidth));
+    
+    //cv::rectangle(scene, detectionROI, cv::Scalar(0,0,255), 1);
+    
+    //if we have faces
+    if (detections.size() > 0)
+    {
+        int width = 0;
+        int ind = 0;
+        
+        //pick biggest face
+        for (size_t i=0; i<detections.size(); i++)
+        {            
+            //cv::rectangle(scene, detections[i], cv::Scalar(255,0,0));
+            
+            if(detections[i].width > width)
+            {
+                width = detections[i].width;
+                ind = i;
+            }
+        }
+        bestDet = detections[ind] + detectionROI.tl();
+        
+        detectionROI = bestDet;
+        minFaceWidth = bestDet.width;
+        maxFaceWidth = bestDet.width;
+        
+        seeta::FaceInfo SeetaDet;
+        SeetaDet.bbox.x = bestDet.x;
+        SeetaDet.bbox.y = bestDet.y;
+        SeetaDet.bbox.width = bestDet.width;
+        SeetaDet.bbox.height = bestDet.height;
+        
+        seeta::ImageData imageData;
+        imageData.data = sceneGray.data;
+        imageData.height = sceneGray.rows;
+        imageData.width = sceneGray.cols;
+        imageData.num_channels = 1;
+        
+        seeta::FacialLandmark landmarks[5];
+        landmarkDetector.PointDetectLandmarks(imageData, SeetaDet, landmarks);
+        
+        camObserver = cv::Point((landmarks[0].x+landmarks[1].x)/2, (landmarks[0].y+landmarks[1].y)/2);
+        
+        //get observer coordinates
+        observer = getObserverFromFace(bestDet, camObserver);
+        
+        /*
+        cv::rectangle(scene, bestDet, cv::Scalar(255,0,0));
+        for(int i=0; i<2; i++)
+        {
+            cv::circle(scene, cv::Point(landmarks[i].x, landmarks[i].y), 3, cv::Scalar(0,0,255), -1);
+        }*/
+        //cv::circle(scene, camObserver, 3, cv::Scalar(0,255,0), -1);
+        
+        return observer;
+    }
+    
+    //cv::imshow("gray", scene);
+    
+    return cv::Scalar();
+}
+
+
+
 cv::Scalar LaptopVR::detectObserver(cv::Mat scene)
 {
     cv::Mat1b sceneGray;
@@ -308,7 +396,7 @@ cv::Scalar LaptopVR::detectObserver(cv::Mat scene)
         //get observer coordinates
         observer = getObserverFromFace(bestDet, camObserver);
         
-        //cv::rectangle(scene, bestDet, cv::Scalar(255,0,0));
+        cv::rectangle(scene, bestDet, cv::Scalar(255,0,0));
         //cv::circle(scene, camObserver, 3, cv::Scalar(0,255,0), -1);
         
         return observer;
@@ -385,8 +473,8 @@ cv::Mat LaptopVR::renderFromCamFrame(cv::Mat camFrame)
 {
     cv::Scalar observer;
     
-    observer = detectObserver(camFrame);
-    filterObserverPosition(observer);
+    observer = detectObserverSeeta(camFrame);
+    observer = filterObserverPosition(observer);
     if (observer != cv::Scalar())
     {
         sceneObserver = observer;

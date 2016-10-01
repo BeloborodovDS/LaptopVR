@@ -5,7 +5,9 @@
 #include <opencv2/objdetect.hpp>
 #include <opencv2/video.hpp>
 
-#define KALMAN_DEBUG 1
+#include "../3rdparty/SeetaFaceEngine/face_alignment.h"
+
+#define KALMAN_DEBUG 0
 
 #define CM_TO_INCH 0.393701
 
@@ -53,6 +55,7 @@ public:
      * @return position of the observer
      */
     cv::Scalar detectObserver(cv::Mat scene);
+    cv::Scalar detectObserverSeeta(cv::Mat scene);
     
     /** 
      * Perspective projection of a point onto the monitor plane, relative for observer
@@ -166,6 +169,9 @@ private:
     
     //frontal Haar-based face detector
     cv::CascadeClassifier faceDetectorHaar;
+    
+    //Seeta facial landmark detector
+    seeta::FaceAlignment landmarkDetector;
     
     /**
      * Calculate observer coordinates from a face and position of eyes
